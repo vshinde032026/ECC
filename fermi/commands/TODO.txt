@@ -1,0 +1,25 @@
+# commands/ — TODO (Stage 3, not yet)
+
+`/fermi-*` slash commands — the human-facing triggers that launch workflows. A command is
+a markdown file with a `description:` frontmatter line and a body of instructions.
+
+When this folder has real commands, declare it in `.claude-plugin/plugin.json` as an
+**array**: `"commands": ["./commands/"]`. (Not before — an empty declared path can fail
+the validator.)
+
+## Anatomy
+
+```markdown
+---
+description: Run the fermi review workflow on the current diff.
+---
+Gather the diff (local changes or a PR), then call the Workflow tool with
+`workflows/fermi-review.workflow.js`. Report blocking vs advisory findings.
+```
+
+## Checklist
+
+- [ ] `fermi-review.md` — gather diff, invoke the review workflow, report results.
+- [ ] `fermi-feature.md` — run the feature-build graph.
+- [ ] Add `"commands": ["./commands/"]` to `plugin.json` once real commands exist.
+- [ ] Each command has a `description:` frontmatter line (required).
