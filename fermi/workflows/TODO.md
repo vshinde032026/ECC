@@ -2,11 +2,21 @@
 
 ## Built
 
+- ✅ **dev-feature.workflow.js** — the dev-workflow pipeline's agent-parallel stretches,
+  driving `fermi-feature-dev`. Stage `study`: three parallel surface sweeps → merged
+  touchpoint map + intake mismatches. Stage `closeout`: per touched module layering
+  audit + bounded unit-test loop, then the clean-logs pass via `audit-backend-logging`
+  as a child workflow. Human gates stay in the main session. Pairs with the
+  `dev-workflow` skill + agent.
+- ✅ **audit-backend-logging.workflow.js** — sweeps `fermi-logging-auditor` across FastAPI
+  route modules; per module a bounded audit → fix → re-audit loop to conform to the
+  SuperStem/Fermi logging-platform standard (constant message + `extra{}`, platform-injected
+  fields not hand-rolled, errors to Sentry via `logger.exception`). Modules run in parallel
+  (distinct files). Pairs with the `backend-logging` skill + agent.
 - ✅ **refactor-module.workflow.js** — Map (code-explorer) → Refactor per unit with a
   bounded refine-with-critic loop (code-simplifier + reviewers) → Verify (build-error-resolver).
   Self-contained (loop inlined — the Workflow sandbox can't import `../lib/`). Parses clean,
   plugin validates. Docs: [`../loops/refactor-module.md`](../loops/refactor-module.md).
-
 
 `.workflow.js` scripts for the Claude Code Workflow tool — the **runnable** entry points
 that spawn many project-aware agents deterministically. A workflow reads a graph from
