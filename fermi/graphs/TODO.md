@@ -1,4 +1,14 @@
-# graphs/ — TODO (Stage 3, not yet)
+# graphs/ — TODO (Stage 3)
+
+## Built
+
+- ✅ **dev-pipeline.md** — the dev-workflow feature pipeline as a DAG: auto nodes with
+  per-node ECC specialists (study, spec-draft, plan-draft, plan-review, layering,
+  unit-tests ∥ console-logs ∥ opt-in hunters, test-quality ∥ docs), gate nodes that halt
+  for the human (ceo-gate, eng-gate), manual nodes (code, sbet), and profiles
+  (`feature`/`bugfix`/`closeout`/`closeout-deep`/`study`) selecting reusable sub-graphs.
+  Executable copy inlined in `../workflows/dev-pipeline.workflow.js` (sandbox can't
+  `require()` this folder).
 
 Declarative DAG definitions. A graph is **data**: nodes are agent steps, edges are
 `dependsOn`. It says *what* to do and in *what order* — nothing about how to run it.

@@ -2,12 +2,17 @@
 
 ## Built
 
-- ✅ **dev-feature.workflow.js** — the dev-workflow pipeline's agent-parallel stretches,
-  driving `fermi-feature-dev`. Stage `study`: three parallel surface sweeps → merged
-  touchpoint map + intake mismatches. Stage `closeout`: per touched module layering
-  audit + bounded unit-test loop, then the clean-logs pass via `audit-backend-logging`
-  as a child workflow. Human gates stay in the main session. Pairs with the
-  `dev-workflow` skill + agent.
+- ✅ **dev-pipeline.workflow.js** — the dev-workflow pipeline as a graph runner. Nodes
+  are unit blocks with `deps`, each running its ECC specialist (code-explorer → study,
+  code-architect → plan-draft, database/security/type-design trio → plan-review,
+  pr-test-analyzer → test-quality, doc-updater → docs, silent-failure-hunter +
+  security-reviewer as opt-in hunters; `fermi-feature-dev` for the rest). Profiles pick
+  sub-graphs (`feature`, `bugfix` — no spec/CEO gate, `closeout`, `closeout-deep`,
+  `study`). Auto nodes run in parallel waves; gate/manual nodes HALT with resume
+  instructions — humans keep the gates. `console-logs` delegates to
+  `audit-backend-logging` as a child workflow. Graph doc:
+  [`../graphs/dev-pipeline.md`](../graphs/dev-pipeline.md). Pairs with the `dev-workflow`
+  skill + agent.
 - ✅ **audit-backend-logging.workflow.js** — sweeps `fermi-logging-auditor` across FastAPI
   route modules; per module a bounded audit → fix → re-audit loop to conform to the
   SuperStem/Fermi logging-platform standard (constant message + `extra{}`, platform-injected
