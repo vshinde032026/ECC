@@ -117,7 +117,9 @@ export const meta = {
 
 // the harness sometimes delivers args as a JSON-encoded string — accept both
 if (typeof args === 'string') {
-  try { args = JSON.parse(args); } catch (e) { throw new Error('dev-pipeline: args arrived as an unparseable string'); }
+  try { args = JSON.parse(args); } catch (e) {
+    throw new Error('dev-pipeline: args must be a JSON OBJECT, e.g. {"profile":"study","feature":"..."} — got a non-JSON string. Re-invoke Workflow with args as an object literal, not prose.');
+  }
 }
 if (!args || typeof args !== 'object') throw new Error('dev-pipeline: args object required');
 const AGENT_OVERRIDE = str(args.agentType); // when set, replaces every node's default

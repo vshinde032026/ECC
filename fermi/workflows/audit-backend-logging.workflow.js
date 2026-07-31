@@ -48,7 +48,9 @@ export const meta = {
 
 // the harness sometimes delivers args as a JSON-encoded string — accept both
 if (typeof args === 'string') {
-  try { args = JSON.parse(args); } catch (e) { throw new Error('audit-backend-logging: args arrived as an unparseable string'); }
+  try { args = JSON.parse(args); } catch (e) {
+    throw new Error('audit-backend-logging: args must be a JSON OBJECT, e.g. {"dir":"euler-api/app"} — got a non-JSON string. Re-invoke Workflow with args as an object literal, not prose.');
+  }
 }
 if (!args || typeof args !== 'object') throw new Error('audit-backend-logging: args object required');
 const explicitModules = Array.isArray(args.modules) ? args.modules.filter(m => typeof m === 'string' && m.trim()) : [];

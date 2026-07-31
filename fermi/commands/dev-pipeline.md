@@ -32,14 +32,26 @@ Run the fermi dev-pipeline graph with: **$ARGUMENTS**
    `git branch --show-current` and stop if on `main`/`master`. `study` is
    read-only and safe anywhere.
 
-3. **Launch:**
+3. **Launch.** `args` MUST be a real JSON object — never a prose string, never
+   pseudo-code. A correct call looks exactly like this (with your values):
 
    ```
    Workflow({
      scriptPath: "${CLAUDE_PLUGIN_ROOT}/workflows/dev-pipeline.workflow.js",
-     args: { profile, ...gathered args }
+     args: {
+       "profile": "feature",
+       "feature": "adaptive-bitrate video delivery",
+       "intakePath": "docs/mind-dumps/2026-07-31-abr.md",
+       "scopeIn": ["ladder generation in the video pipeline", "player quality selector"],
+       "specPath": "docs/superpowers/specs/2026-07-31-abr.md",
+       "planPath": "docs/superpowers/plans/2026-07-31-abr.md"
+     }
    })
    ```
+
+   Include only the keys the selected nodes need (closeout runs need
+   `"backendModules": [...]` / `"frontendModules": [...]` instead of the
+   spec/plan paths).
 
 4. **On halt** (`status: 'halted'`): the pipeline reached a human gate. Present
    `results` so far and the `instruction` verbatim, run that step WITH the user

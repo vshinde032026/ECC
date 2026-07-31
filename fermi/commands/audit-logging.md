@@ -27,13 +27,22 @@ Launch the fermi logging sweep on: **$ARGUMENTS**
    over 30, tell the user the expected scale (roughly 3–5 agent runs per file)
    and confirm before launching.
 
-4. **Launch** the Workflow tool:
+4. **Launch** the Workflow tool. `args` MUST be a real JSON object — never a
+   prose string, never pseudo-code. Correct calls look exactly like these:
 
    ```
    Workflow({
      scriptPath: "${CLAUDE_PLUGIN_ROOT}/workflows/audit-backend-logging.workflow.js",
-     args: { dir | modules, maxPasses }
+     args: { "dir": "euler-api/app" }
    })
+   ```
+
+   ```
+   args: { "modules": ["backend/app/routers/notebook.py"], "maxPasses": 3 }
+   ```
+
+   ```
+   args: { "dir": "backend/app", "scope": "routes" }
    ```
 
 5. **When it completes, report:** the clean/dirty count, per-module verdicts,
