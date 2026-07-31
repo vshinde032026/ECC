@@ -33,12 +33,13 @@ The pipeline is decomposed into reusable unit blocks; the human gates are never 
 - **`graphs/dev-pipeline.md`** — the pipeline as a DAG: every phase is a node
   (`auto` | `gate` | `manual`) with `deps`; profiles select reusable sub-graphs
   (`feature` = full pipeline, `bugfix` = no spec/CEO gate, `closeout` = tail only,
-  `closeout-deep` = tail + hunters, `study` = map only). Each auto node runs its
-  specialist ECC agent (code-explorer for study, code-architect for plan-draft, the
-  database/security/type-design trio for plan-review, pr-test-analyzer for
-  test-quality, doc-updater for docs); `fermi-feature-dev` covers the judgment-heavy
-  nodes. `unit-tests` ∥ `console-logs` (∥ opt-in hunters) share a wave after
-  `layering`; `test-quality` ∥ `docs` share the next.
+  `closeout-deep` = tail + hunters, `study` = map only). Self-contained: every auto
+  node runs a fermi agent — `fermi-feature-dev` for editing/drafting nodes (study,
+  spec-draft, plan-draft, layering, unit-tests, docs), `fermi-code-reviewer` for every
+  report-only node (plan-review's schema/security/type-design lenses, test-quality,
+  the opt-in hunters) — its toolset has no Edit, so read-only is structural.
+  `unit-tests` ∥ `console-logs` (∥ opt-in hunters) share a wave after `layering`;
+  `test-quality` ∥ `docs` share the next.
 - **`workflows/dev-pipeline.workflow.js`** — the runner. Executes ready `auto` nodes in
   parallel waves; on reaching a `gate`/`manual` node it HALTS and returns the human-step
   instruction plus resume args (`done: [...]`). The main session runs the gate with the

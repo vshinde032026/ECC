@@ -9,22 +9,21 @@ this folder) — this file is the canonical map; keep the two in sync.
 
 ```
                     ┌─────────┐
-                    │  study  │ auto · ecc:code-explorer · 3 parallel sweeps
+                    │  study  │ auto · feature-dev (STUDY) · 3 parallel sweeps
                     └────┬────┘
                     ┌────▼───────┐
-                    │ spec-draft │ auto · fermi:fermi-feature-dev
+                    │ spec-draft │ auto · feature-dev (DRAFT)
                     └────┬───────┘
                     ┌────▼─────┐
                     │ ceo-gate │ GATE · gstack /plan-ceo-review with the user
                     └────┬─────┘
                     ┌────▼───────┐
-                    │ plan-draft │ auto · ecc:code-architect
+                    │ plan-draft │ auto · feature-dev (DRAFT)
                     └────┬───────┘  (also deps: study — holds in bugfix)
                     ┌────▼────────┐
-                    │ plan-review │ auto · 3 read-only lenses in parallel:
-                    └────┬────────┘  ecc:database-reviewer (schema prefs) ·
-                         │           ecc:security-reviewer (auth surface) ·
-                         │           ecc:type-design-analyzer (interfaces)
+                    │ plan-review │ auto · code-reviewer × 3 lenses in ∥:
+                    └────┬────────┘  schema prefs · auth surface ·
+                         │           interface/type design
                     ┌────▼─────┐
                     │ eng-gate │ GATE · gstack /plan-eng-review with the user,
                     └────┬─────┘  armed with results['plan-review'] findings
@@ -32,22 +31,21 @@ this folder) — this file is the canonical map; keep the two in sync.
                     │  code   │ MANUAL · superpowers:executing-plans, main session
                     └────┬────┘
                     ┌────▼─────┐
-                    │ layering │ auto · per touched module, parallel
-                    └────┬─────┘  (frontend via ecc:react-reviewer)
+                    │ layering │ auto · feature-dev · per touched module, ∥
+                    └────┬─────┘
        ┌──────────┬──────┴────────┬──────────────────┐
  ┌─────▼──────┐ ┌─▼────────────┐ ┌▼────────────────┐ ┌▼─────────────┐
  │ unit-tests │ │ console-logs │ │ silent-failures │ │   security   │
- │            │ │ (child wf:   │ │ ecc:silent-     │ │ ecc:security-│
- │            │ │ audit-backend│ │ failure-hunter  │ │ reviewer     │
- │            │ │ -logging)    │ │ OPT-IN · report │ │ OPT-IN ·     │
- └─────┬──────┘ └─┬────────────┘ │ only            │ │ report only  │
-       │          │              └─────────────────┘ └──────────────┘
+ │ feature-dev│ │ (child wf:   │ │ code-reviewer   │ │ code-reviewer│
+ │            │ │ audit-backend│ │ OPT-IN · report │ │ OPT-IN ·     │
+ │            │ │ -logging)    │ │ only            │ │ report only  │
+ └─────┬──────┘ └─┬────────────┘ └─────────────────┘ └──────────────┘
        │          │        one wave: tests edit tests/**, logging edits
        │          │        source, hunters only report — no collisions
  ┌─────▼────────┐ │ ┌──────────┐
  │ test-quality │ │ │   docs   │  second wave, also parallel: test-quality
- │ ecc:pr-test- │ │ │ ecc:doc- │  (reads tests/) ∥ docs (edits docs/** +
- │ analyzer     │ │ │ updater  │  module CLAUDE.md — close-out items 4-5);
+ │ code-reviewer│ │ │ feature- │  (reads tests/) ∥ docs (edits docs/** +
+ │              │ │ │ dev      │  module CLAUDE.md — close-out items 4-5);
  └─────┬────────┘ │ └──┬───────┘  docs deps: layering + unit-tests +
        │          └────┤          console-logs (the three EDITORS)
        └──────┬────────┘
@@ -55,6 +53,11 @@ this folder) — this file is the canonical map; keep the two in sync.
          │  sbet   │ MANUAL · Phase 8 live system test, main session
          └─────────┘
 ```
+
+**Self-contained:** every auto node runs a fermi agent — `fermi-feature-dev`
+for editing/drafting work, `fermi-code-reviewer` for every report-only node
+(its toolset has no Edit, so read-only is structural). No dependency on the
+ecc plugin; lens/hunt expertise is carried by the prompts.
 
 ## Node kinds
 
@@ -69,7 +72,7 @@ control returns to the main session, and the run resumes with
 `done: [...completed, '<gate>']` after the human step.
 
 `args.agentType` is a global override that replaces **every** node's specialist
-default (escape hatch when ecc/fermi aren't installed); the rules are also
+default (escape hatch when fermi isn't installed); the rules are also
 inlined in the prompts, so a generic agent still works.
 
 ## Profiles (reusable sub-graphs)

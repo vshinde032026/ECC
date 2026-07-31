@@ -3,10 +3,9 @@
 ## Built
 
 - ✅ **dev-pipeline.workflow.js** — the dev-workflow pipeline as a graph runner. Nodes
-  are unit blocks with `deps`, each running its ECC specialist (code-explorer → study,
-  code-architect → plan-draft, database/security/type-design trio → plan-review,
-  pr-test-analyzer → test-quality, doc-updater → docs, silent-failure-hunter +
-  security-reviewer as opt-in hunters; `fermi-feature-dev` for the rest). Profiles pick
+  are unit blocks with `deps`, self-contained on fermi agents: `fermi-feature-dev` for
+  editing/drafting nodes, `fermi-code-reviewer` for every report-only node (plan-review
+  lenses, test-quality, opt-in silent-failure + security hunters). Profiles pick
   sub-graphs (`feature`, `bugfix` — no spec/CEO gate, `closeout`, `closeout-deep`,
   `study`). Auto nodes run in parallel waves; gate/manual nodes HALT with resume
   instructions — humans keep the gates. `console-logs` delegates to

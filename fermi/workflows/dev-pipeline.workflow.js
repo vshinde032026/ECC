@@ -24,20 +24,20 @@ export const meta = {
 // the Workflow sandbox can't require() ../graphs/ or ../lib/).
 //
 //                        ┌─────────┐
-//                        │  study  │ auto · ecc:code-explorer
+//                        │  study  │ auto · fermi-feature-dev (STUDY)
 //                        └────┬────┘
 //                        ┌────▼───────┐
-//                        │ spec-draft │ auto · fermi:fermi-feature-dev
+//                        │ spec-draft │ auto · fermi-feature-dev (DRAFT)
 //                        └────┬───────┘
 //                        ┌────▼─────┐
 //                        │ ceo-gate │ GATE (halt: gstack /plan-ceo-review)
 //                        └────┬─────┘
 //                        ┌────▼───────┐
-//                        │ plan-draft │ auto · ecc:code-architect
+//                        │ plan-draft │ auto · fermi-feature-dev (DRAFT)
 //                        └────┬───────┘
 //                        ┌────▼────────┐
-//                        │ plan-review │ auto · 3 read-only specialists ∥
-//                        └────┬────────┘  (database / security / type-design)
+//                        │ plan-review │ auto · fermi-code-reviewer ∥ ×3
+//                        └────┬────────┘  lenses (schema / security / type-design)
 //                        ┌────▼─────┐
 //                        │ eng-gate │ GATE (halt: gstack /plan-eng-review,
 //                        └────┬─────┘   armed with plan-review findings)
@@ -45,8 +45,8 @@ export const meta = {
 //                        │  code   │ MANUAL (halt: superpowers:executing-plans)
 //                        └────┬────┘
 //                        ┌────▼─────┐
-//                        │ layering │ auto (per touched module, parallel;
-//                        └────┬─────┘  frontend via ecc:react-reviewer)
+//                        │ layering │ auto (per touched module, parallel)
+//                        └────┬─────┘
 //        ┌─────────────┬──────┴─────────┬─────────────────┐
 //  ┌─────▼──────┐ ┌────▼─────────┐ ┌────▼────────────┐ ┌──▼───────────┐
 //  │ unit-tests │ │ console-logs │ │ silent-failures │ │  security    │
@@ -55,10 +55,10 @@ export const meta = {
 //        │             │           └─────────────────┘ └──────────────┘
 //        │             │      one wave: tests edit tests/**, logging edits
 //        │             │      source, hunters only report — no collisions
-//  ┌─────▼─────────┐ ┌─▼──────┐
-//  │ test-quality  │ │  docs  │   second wave, also parallel: test-quality
-//  └─────┬─────────┘ └─┬──────┘   reads tests/, docs edits docs/** + module
-//        └──────┬──────┘          CLAUDE.md (close-out items 4-5)
+//  ┌─────▼─────────┐ ┌─▼──────┐   second wave, also parallel:
+//  │ test-quality  │ │  docs  │   test-quality (fermi-code-reviewer, reads
+//  └─────┬─────────┘ └─┬──────┘   tests/) ∥ docs (fermi-feature-dev, edits
+//        └──────┬──────┘          docs/** + module CLAUDE.md — items 4-5)
 //          ┌────▼────┐
 //          │  sbet   │ MANUAL (halt: Phase 8 in main session)
 //          └─────────┘
@@ -80,13 +80,14 @@ export const meta = {
 // resume.done (completed node list) to continue. Gates are boundaries where
 // control goes back to the user, never agent self-approval.
 //
-// AGENT RESOLUTION: each node names its specialist default (see NODES —
-// ecc:code-explorer for study, ecc:code-architect for plan-draft, the
-// reviewer trio for plan-review, ecc:pr-test-analyzer / ecc:doc-updater /
-// hunters downstream; fermi:fermi-feature-dev where judgment spans surfaces).
-// Passing args.agentType overrides EVERY node (escape hatch when ecc/fermi
-// aren't installed — e.g. 'general-purpose'); the rules are also inlined in
-// the prompts, so a generic agent still works.
+// AGENT RESOLUTION — SELF-CONTAINED, fermi agents only (no ecc dependency):
+// editing/drafting nodes (study, spec-draft, plan-draft, layering,
+// unit-tests, docs) run fermi:fermi-feature-dev; every report-only node
+// (plan-review lenses, test-quality, silent-failures, security) runs
+// fermi:fermi-code-reviewer, whose toolset has no Edit — read-only is
+// structural, not just prompted. Lens/hunt expertise is carried by the
+// prompts. Passing args.agentType overrides EVERY node (escape hatch when
+// fermi isn't installed — e.g. 'general-purpose').
 //
 // SAFETY: layering / unit-tests / console-logs EDIT the working tree. Run on
 // the feature branch/worktree, never main, and review the diff.
@@ -115,9 +116,10 @@ export const meta = {
 // ---------------------------------------------------------------------------
 
 if (!args || typeof args !== 'object') throw new Error('dev-pipeline: args object required');
-const AGENT_OVERRIDE = str(args.agentType); // when set, replaces every node's specialist default
-function agentFor(specialist) { return AGENT_OVERRIDE || specialist; }
-const FEATURE_DEV = 'fermi:fermi-feature-dev';
+const AGENT_OVERRIDE = str(args.agentType); // when set, replaces every node's default
+function agentFor(dflt) { return AGENT_OVERRIDE || dflt; }
+const FEATURE_DEV = 'fermi:fermi-feature-dev';    // editing/drafting nodes
+const CODE_REVIEWER = 'fermi:fermi-code-reviewer'; // report-only nodes (toolset has no Edit)
 const maxPasses = boundInt(args.maxPasses, 1, 4, 2);
 const feature = str(args.feature);
 const intakePath = str(args.intakePath);
@@ -318,7 +320,7 @@ async function nodeStudy() {
     `READ-ONLY — edit nothing. Return touchpoints as {surface: "${s.key}", file, roleToday, likelyChange}.`;
 
   const sweeps = (await parallel(SURFACES.map(s => () =>
-    agent(prompt(s), { agentType: agentFor('ecc:code-explorer'), phase: 'Study', label: `study:${s.key}`, schema: STUDY_SCHEMA })
+    agent(prompt(s), { agentType: agentFor(FEATURE_DEV), phase: 'Study', label: `study:${s.key}`, schema: STUDY_SCHEMA })
   ))).filter(Boolean);
   if (sweeps.length < SURFACES.length) log(`WARNING: only ${sweeps.length}/${SURFACES.length} surface sweeps returned`);
 
@@ -369,7 +371,7 @@ async function nodePlanDraft() {
     `data changes (extend tables first, new table needs justification, rollback story), worker changes (queue, ` +
     `idempotency, retries), twin sync per REDUNDANCY_REGISTRY.md, test plan (AI calls always mocked), rollout. ` +
     `Return the path, a 3-sentence summary, and open questions for eng review.`,
-    { agentType: agentFor('ecc:code-architect'), phase: 'Plan draft', label: 'plan-draft', schema: DRAFT_SCHEMA }
+    { agentType: agentFor(FEATURE_DEV), phase: 'Plan draft', label: 'plan-draft', schema: DRAFT_SCHEMA }
   );
 }
 
@@ -389,7 +391,7 @@ async function nodeLayering() {
       agent(layerPrompt(m, 'backend'), { agentType: agentFor(FEATURE_DEV), phase: 'Layering', label: `layer:${m}`, schema: LAYER_SCHEMA })
         .then(r => ({ module: m, surface: 'backend', ...(r || {}) }))),
     ...frontendModules.map(m => () =>
-      agent(layerPrompt(m, 'frontend'), { agentType: agentFor('ecc:react-reviewer'), phase: 'Layering', label: `layer:${m}`, schema: LAYER_SCHEMA })
+      agent(layerPrompt(m, 'frontend'), { agentType: agentFor(FEATURE_DEV), phase: 'Layering', label: `layer:${m}`, schema: LAYER_SCHEMA })
         .then(r => ({ module: m, surface: 'frontend', ...(r || {}) })))
   ];
   const modules = (await parallel(thunks)).filter(Boolean);
@@ -436,20 +438,20 @@ async function nodeConsoleLogs() {
 async function nodePlanReview() {
   const LENSES = [
     {
-      key: 'schema', agentType: 'ecc:database-reviewer',
+      key: 'schema',
       focus: 'the Data changes section: migrations, backfills, rollback story. Judge against the Schema preferences: ' +
         'fewer tables wins, extend existing tables first (columns / discriminators / JSONB), duplicated-denormalized ' +
         'data is acceptable to avoid a join, every NEW table needs a stated justification ("cleaner modeling" does not count). ' +
         'Also: index needs for the new query patterns, migration safety on a live DB.'
     },
     {
-      key: 'security', agentType: 'ecc:security-reviewer',
+      key: 'security',
       focus: 'the API design and task list: auth dependencies on every new/changed endpoint, permission checks matching ' +
         'the roles in the spec, input validation at trust boundaries, injection/SSRF risk in anything touching user ' +
         'input or external calls, secrets handling. Flag any endpoint whose plan task does not name its auth dep.'
     },
     {
-      key: 'type-design', agentType: 'ecc:type-design-analyzer',
+      key: 'type-design',
       focus: 'the Interfaces and Implementation classes sections: do the contracts (service interfaces, Pydantic schemas, ' +
         'task signatures) express their invariants, is each class single-responsibility, are abstractions depended on ' +
         'rather than concretions, is any named pattern appropriate rather than pattern-soup, do frontend state/component ' +
@@ -465,7 +467,7 @@ async function nodePlanReview() {
     `this lens is clean — do not invent issues to look busy.`;
 
   const reviews = await parallel(LENSES.map(l => () =>
-    agent(lensPrompt(l), { agentType: agentFor(l.agentType), phase: 'Plan review', label: `plan-review:${l.key}`, schema: FINDINGS_SCHEMA })
+    agent(lensPrompt(l), { agentType: agentFor(CODE_REVIEWER), phase: 'Plan review', label: `plan-review:${l.key}`, schema: FINDINGS_SCHEMA })
       .then(r => ({ lens: l.key, findings: (r && r.findings) || [] }))
   ));
   const byLens = {};
@@ -490,7 +492,7 @@ async function nodeSilentFailures() {
       `caught-and-ignored), bad fallbacks that mask errors (defaulting on failure without signal), missing error ` +
       `propagation, promises/tasks whose failure nobody observes. Do NOT edit — findings go to the close-out summary ` +
       `for the human. {severity, area, issue, suggestion} per finding; empty list if clean.`,
-      { agentType: agentFor('ecc:silent-failure-hunter'), phase: 'Silent failures', label: `silent:${m}`, schema: FINDINGS_SCHEMA }
+      { agentType: agentFor(CODE_REVIEWER), phase: 'Silent failures', label: `silent:${m}`, schema: FINDINGS_SCHEMA }
     ).then(r => ({ module: m, findings: (r && r.findings) || [] }))
   ));
   const modules = reviews.filter(Boolean);
@@ -504,7 +506,7 @@ async function nodeSecurity() {
       `unvalidated user input, injection (SQL/command/LaTeX), SSRF in outbound calls, secrets or credentials in ` +
       `code or logs, unsafe deserialization, permission checks that trust the client. Do NOT edit — findings go to ` +
       `the close-out summary for the human. {severity, area, issue, suggestion} per finding; empty list if clean.`,
-      { agentType: agentFor('ecc:security-reviewer'), phase: 'Security', label: `security:${m}`, schema: FINDINGS_SCHEMA }
+      { agentType: agentFor(CODE_REVIEWER), phase: 'Security', label: `security:${m}`, schema: FINDINGS_SCHEMA }
     ).then(r => ({ module: m, findings: (r && r.findings) || [] }))
   ));
   const modules = reviews.filter(Boolean);
@@ -522,7 +524,7 @@ async function nodeTestQuality() {
       `assert real behavior (not mock-echoes), would they catch the realistic bugs in this module (wrong branch, ` +
       `off-by-one, error path, permission miss), are corner cases and failure paths exercised, is anything ` +
       `over-mocked to the point of testing nothing? Do NOT edit. Verdict strong|adequate|weak + concrete gaps.`,
-      { agentType: agentFor('ecc:pr-test-analyzer'), phase: 'Test quality', label: `test-quality:${m}`, schema: QUALITY_SCHEMA }
+      { agentType: agentFor(CODE_REVIEWER), phase: 'Test quality', label: `test-quality:${m}`, schema: QUALITY_SCHEMA }
     ).then(r => ({ module: m, ...(r || { verdict: 'weak', gaps: ['analyzer returned no result'] }) }))
   ));
   const modules = reviews.filter(Boolean);
@@ -547,7 +549,7 @@ async function nodeDocs() {
     `anything the old guidance now gets wrong. A substantial new module gets a CLAUDE.md in the style of its siblings.\n` +
     `Edit DOCUMENTATION ONLY — never source code or tests. Describe what the code now does (read it), not what the ` +
     `plan hoped. Return the doc paths you updated and created.`,
-    { agentType: agentFor('ecc:doc-updater'), phase: 'Docs', label: 'docs', schema: DOCS_SCHEMA }
+    { agentType: agentFor(FEATURE_DEV), phase: 'Docs', label: 'docs', schema: DOCS_SCHEMA }
   );
 }
 

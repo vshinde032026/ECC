@@ -367,7 +367,7 @@ Items 1–5 are automated: run `workflows/dev-pipeline.workflow.js` with
 `profile: 'closeout'` and the touched module lists — layering runs first per
 module; then unit-tests ∥ console-logs as parallel siblings (tests touch
 `tests/**`, logging edits source — disjoint files; logging delegates to the
-`audit-backend-logging` workflow); then test-quality (pr-test-analyzer
+`audit-backend-logging` workflow); then test-quality (`fermi-code-reviewer`
 independently judges the new tests' behavioral coverage — the test writer
 never grades its own homework) ∥ docs (items 4–5). Use
 `profile: 'closeout-deep'` on riskier changes to add the report-only
@@ -393,7 +393,7 @@ use the fallbacks named per item.
    implementation doc reflects the new design. Create the feature dir if this
    was a brand-new feature. (Features with `docs/product/features/<feature>/`:
    update via the `superstem-docs` skill's update mode.) Automated by the
-   `docs` node (`ecc:doc-updater`).
+   `docs` node.
 5. **Module CLAUDE.md files** — update the `CLAUDE.md` inside each touched
    module: new invariants the change introduced, changed flows, anything the
    old guidance now gets wrong. If a substantial new module was created, give

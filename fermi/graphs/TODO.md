@@ -2,8 +2,8 @@
 
 ## Built
 
-- ✅ **dev-pipeline.md** — the dev-workflow feature pipeline as a DAG: auto nodes with
-  per-node ECC specialists (study, spec-draft, plan-draft, plan-review, layering,
+- ✅ **dev-pipeline.md** — the dev-workflow feature pipeline as a DAG: auto nodes
+  self-contained on fermi agents (study, spec-draft, plan-draft, plan-review, layering,
   unit-tests ∥ console-logs ∥ opt-in hunters, test-quality ∥ docs), gate nodes that halt
   for the human (ceo-gate, eng-gate), manual nodes (code, sbet), and profiles
   (`feature`/`bugfix`/`closeout`/`closeout-deep`/`study`) selecting reusable sub-graphs.
