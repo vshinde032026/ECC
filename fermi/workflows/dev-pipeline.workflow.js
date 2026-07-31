@@ -115,6 +115,10 @@ export const meta = {
 //     completed: string[], results: { <nodeId>: ... }, resume?: args-to-reinvoke }
 // ---------------------------------------------------------------------------
 
+// the harness sometimes delivers args as a JSON-encoded string — accept both
+if (typeof args === 'string') {
+  try { args = JSON.parse(args); } catch (e) { throw new Error('dev-pipeline: args arrived as an unparseable string'); }
+}
 if (!args || typeof args !== 'object') throw new Error('dev-pipeline: args object required');
 const AGENT_OVERRIDE = str(args.agentType); // when set, replaces every node's default
 function agentFor(dflt) { return AGENT_OVERRIDE || dflt; }
