@@ -1,4 +1,12 @@
-# commands/ — TODO (Stage 3, not yet)
+# commands/ — TODO (Stage 3)
+
+Built:
+- audit-logging.md — /fermi:audit-logging <routers-dir | file.py ...> [maxPasses];
+  wraps workflows/audit-backend-logging.workflow.js via ${CLAUDE_PLUGIN_ROOT},
+  with branch + sweep-size safety gates.
+- dev-pipeline.md — /fermi:dev-pipeline <profile> [paths...]; wraps
+  workflows/dev-pipeline.workflow.js, gathers per-node args, halts back to the
+  human at gates. plugin.json now declares "commands": ["./commands/"].
 
 `/fermi-*` slash commands — the human-facing triggers that launch workflows. A command is
 a markdown file with a `description:` frontmatter line and a body of instructions.

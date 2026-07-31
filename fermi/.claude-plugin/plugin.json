@@ -17,5 +17,8 @@
     "agentic",
     "project-aware"
   ],
-  "mcpServers": {}
+  "mcpServers": {},
+  "commands": [
+    "./commands/"
+  ]
 }
