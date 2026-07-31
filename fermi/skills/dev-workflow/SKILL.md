@@ -53,6 +53,28 @@ The pipeline is decomposed into reusable unit blocks; the human gates are never 
   child; the `docs` node automates close-out items 4–5 (feature docs + module
   CLAUDE.md).
 
+## Right-sizing: match the pipeline to the input
+
+The input may be a mind dump, a finished spec sheet, a bug report, or a one-line ask.
+**Node count is proportional to blast radius, never to input length.** Route by what
+was handed in, confirm the route with the user in ONE line, then run — do not push a
+small fix through phases built for a feature.
+
+| Input | Route |
+|---|---|
+| Mind dump / vague idea | full `feature` profile (intake conversation first) |
+| **Spec sheet already written** | their doc IS the spec — place/link it under `docs/superpowers/specs/`, skip `spec-draft`; run `ceo-gate` only if scope is genuinely new or contested (else record "gate skipped: spec supplied" in the Review Log); enter at `plan-draft`: `nodes: ['study','plan-draft','plan-review','eng-gate','code','layering','unit-tests','console-logs','test-quality','docs']` |
+| Bug, cause known | `bugfix` profile (no spec, no CEO gate) |
+| Bug, cause unknown | investigate first (`debug-workflow` A) — come back with `bugfix` once the cause is known; planning a fix for an undiagnosed bug is how wrong fixes get planned |
+| Trivial fix (one file, obvious, reversible) | **no pipeline** — just fix it, run the relevant close-out node(s) on the touched module if warranted, done |
+| Code already written, needs hardening | `closeout` (or `closeout-deep` for auth/error-path/input-handling changes) |
+| Only understanding needed | `study` profile — read-only, safe anywhere |
+
+Signals you are overdoing it: writing a spec for behavior nobody disputes; a plan doc
+longer than the diff it produces; running CEO review on a bug fix. Signals you are
+underdoing it: a "trivial fix" that touches a second file; a bug fix that changes an
+API shape (that's a `feature` in disguise — re-route).
+
 ## External dependencies (assumed installed, not vendored)
 
 This skill deliberately delegates to plugins that are always present in our setups —

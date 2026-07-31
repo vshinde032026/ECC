@@ -47,7 +47,7 @@
       "name": "fermi",
       "source": "./fermi",
       "description": "Self-contained project-aware agentic layer for StudyTools v2 (SuperStem/Capacity): fermi agents (feature-dev, code/python reviewers, logging auditor), dev-workflow + backend-logging skills, and graph-driven workflows (dev-pipeline, audit-backend-logging, refactor-module). No dependency on the ecc plugin.",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "author": {
         "name": "Fermi",
         "email": "vaibhav@fermi.ai"

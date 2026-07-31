@@ -8,11 +8,17 @@ Run the fermi dev-pipeline graph with: **$ARGUMENTS**
 
 ## Steps
 
-1. **Parse the arguments.** First token is the profile: `study`, `bugfix`,
-   `feature`, `closeout`, or `closeout-deep`. Remaining tokens are paths/context.
-   Then assemble the args the selected nodes need (ask for what's missing
-   rather than guessing — see the node-inputs table in
-   `${CLAUDE_PLUGIN_ROOT}/graphs/dev-pipeline.md`):
+1. **Parse the arguments.** If the first token is a profile (`study`, `bugfix`,
+   `feature`, `closeout`, `closeout-deep`), use it; remaining tokens are
+   paths/context. **Otherwise treat the whole input as free text and ROUTE it**
+   per the Right-sizing table in the `dev-workflow` skill (mind dump → feature;
+   supplied spec → custom nodes entering at plan-draft; known-cause bug →
+   bugfix; unknown-cause bug → debug-workflow first; trivial fix → no pipeline,
+   just fix it; written code → closeout; understanding only → study). State
+   the chosen route and why in ONE line, get a yes, then proceed. Never
+   escalate a small ask into the full pipeline. Then assemble the args the
+   selected nodes need (ask for what's missing rather than guessing — see the
+   node-inputs table in `${CLAUDE_PLUGIN_ROOT}/graphs/dev-pipeline.md`):
    - `study` / `feature` / `bugfix` → `feature` (description), optionally
      `intakePath` (mind-dump md) and `scopeIn[]`.
    - `feature` also → `specPath` + `planPath`; `bugfix` → `planPath`
