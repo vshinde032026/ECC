@@ -43,6 +43,10 @@ export const meta = {
 //     stats: { clean, dirty } }
 // ---------------------------------------------------------------------------
 
+// the harness sometimes delivers args as a JSON-encoded string — accept both
+if (typeof args === 'string') {
+  try { args = JSON.parse(args); } catch (e) { throw new Error('audit-backend-logging: args arrived as an unparseable string'); }
+}
 if (!args || typeof args !== 'object') throw new Error('audit-backend-logging: args object required');
 const explicitModules = Array.isArray(args.modules) ? args.modules.filter(m => typeof m === 'string' && m.trim()) : [];
 const dir = typeof args.dir === 'string' ? args.dir.trim() : '';
