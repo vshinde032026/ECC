@@ -122,6 +122,24 @@ twins — only the platform.
 
 # Part 2 — The audit
 
+## Step 0 — Scope contract: ONE module per run
+
+This skill audits **one file** at a time. If the target is a directory, a service root
+(e.g. `./euler-api`), or several files, do NOT grind through them file-by-file inline —
+launch the sweep workflow instead, which runs this same audit per module in parallel
+with bounded fix → re-audit loops:
+
+```
+Workflow({
+  scriptPath: "${CLAUDE_PLUGIN_ROOT}/workflows/audit-backend-logging.workflow.js",
+  args: { dir: "<the directory>" }        // scope: 'service' by default — routes AND
+})                                        // services/agents/tasks; 'routes' to restrict
+```
+
+(equivalently: the `/fermi:audit-logging <dir>` command). Working inline on a whole
+service produces exactly one deeply-audited file and 90 untouched ones when the
+session runs out of room.
+
 ## Step 1 — Read the target file
 
 Read the full file. If no path was given, ask which module. Note the service (`backend/` vs
@@ -146,6 +164,7 @@ Read the full file. If no path was given, ask which module. Note the service (`b
 - The access log already records status/duration — Category 3 is about *what the handler did*.
 
 ### Category 4 — Service-layer logs (inflection points only, not every function)
+
 | Situation | Level | Log |
 |---|---|---|
 | Cache hit | `INFO` | what found + key id |
@@ -162,6 +181,7 @@ branchless function already covered by a logged caller.
 `session_id`/`user`/`course_id`/`turn`).
 
 ### Category 5 — Error and exception logs
+
 | Situation | Level | Form |
 |---|---|---|
 | Expected/handled (404, validation, known edge) | `WARNING` | `logger.warning("...", extra={...})` — no traceback |

@@ -1,5 +1,5 @@
 ---
-description: Sweep the backend-logging auditor over FastAPI route modules — audit → fix → re-audit per module until logs conform to the SuperStem/Fermi logging standard. Usage /fermi:audit-logging <routers-dir | file.py ...> [maxPasses]
+description: Sweep the backend-logging auditor over a backend service or module set — audit → fix → re-audit per module until logs conform to the SuperStem/Fermi logging standard. Covers routes AND services/agents/tasks by default. Usage /fermi:audit-logging <service-root | dir | file.py ...> [routes] [maxPasses]
 ---
 
 # Audit backend logging
@@ -10,11 +10,14 @@ Launch the fermi logging sweep on: **$ARGUMENTS**
 
 1. **Parse the arguments.**
    - A path ending in `.py` (one or more) → pass as `modules: [...]`.
-   - A directory path → pass as `dir: "<path>"` (the workflow discovers route files in it).
+   - A directory path → pass as `dir: "<path>"`. A service root (e.g. `euler-api`
+     or `euler-api/app`) is valid — discovery finds every module with logic worth
+     logging: routes, websocket handlers, service layer, agents, Celery tasks,
+     external-system clients. Tests/schemas/config/`__init__` are excluded.
+   - The bare word `routes` → pass `scope: "routes"` (route/ws handler modules only).
    - A bare integer (1–4) anywhere → `maxPasses` (default 2).
-   - No arguments → ask which routers directory or files to audit; suggest the
-     repo's routers dirs you can see (e.g. `backend/app/routers`,
-     `euler-backend/app/api/routes`).
+   - No arguments → ask which service or files to audit; suggest what you can
+     see (e.g. `backend/app`, `euler-api/app`).
 
 2. **Safety gate.** Run `git branch --show-current`. If on `main`/`master`, STOP
    and tell the user to create a branch first — this sweep edits source files

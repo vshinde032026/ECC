@@ -1,7 +1,7 @@
 export const meta = {
   name: 'audit-backend-logging',
   description:
-    'Sweep the backend-logging auditor across FastAPI route modules. Per module runs a bounded audit -> fix -> re-audit loop until the module conforms to the SuperStem/Fermi logging-platform standard (constant message + structured extra{}, platform-injected fields not hand-rolled, correct levels, errors routed to Sentry via logger.exception). Modules are independent files, so they run in parallel.',
+    'Sweep the backend-logging auditor across a backend service — routes, service layer, agents, tasks, and external-system clients by default (scope: routes restricts to handlers). Per module runs a bounded audit -> fix -> re-audit loop until it conforms to the SuperStem/Fermi logging-platform standard (constant message + structured extra{}, platform-injected fields not hand-rolled, correct levels, errors routed to Sentry via logger.exception). Modules are independent files, so they run in parallel.',
   phases: [
     { title: 'Discover', detail: 'list route modules to audit (when a dir is given)' },
     { title: 'Audit', detail: 'per module: audit the logging against the 6 categories' },
@@ -31,8 +31,11 @@ export const meta = {
 //
 // Caller contract (args) — provide modules OR dir:
 //   {
-//     modules?:   string[],  // explicit route file paths to audit
-//     dir?:       string,    // a routers dir to discover .py handlers in (used if modules absent)
+//     modules?:   string[],  // explicit file paths to audit
+//     dir?:       string,    // a dir (routers dir OR service root) to discover modules in
+//     scope?:     string,    // 'service' (default): every module with logic worth logging —
+//                            // routes, ws handlers, services, agents, tasks, external clients.
+//                            // 'routes': FastAPI route/ws handler modules only.
 //     agentType?: string,    // override the auditor agent (default 'fermi:fermi-logging-auditor')
 //     maxPasses?: number,    // fix -> re-audit rounds per module (default 2)
 //   }
@@ -53,6 +56,7 @@ const dir = typeof args.dir === 'string' ? args.dir.trim() : '';
 if (!explicitModules.length && !dir) throw new Error('audit-backend-logging: provide args.modules[] or args.dir');
 const AGENT = typeof args.agentType === 'string' && args.agentType.trim() ? args.agentType.trim() : 'fermi:fermi-logging-auditor';
 const maxPasses = boundInt(args.maxPasses, 1, 4, 2);
+const scope = args.scope === 'routes' ? 'routes' : 'service';
 
 // Logging-platform standard, inlined so a generic agent still behaves. Mirrors
 // the backend-logging skill / console-log standard.
@@ -102,8 +106,10 @@ const auditPrompt = (m) =>
   `Audit the logging in \`${m}\` against the backend-logging skill's six categories ` +
   `(1 logger setup, 2 API entry logs, 3 API response logs, 4 service-layer inflection points, ` +
   `5 error/exception logs, 6 platform violations & hygiene). ` +
-  `Read the full file first. Do NOT edit in this step — just report. Set clean=true only if every ` +
-  `category passes with no gaps. List each gap as category + file:line + issue.\n\n${STANDARD_RULES}`;
+  `Read the full file first. Do NOT edit in this step — just report. Categories 2 and 3 apply ` +
+  `ONLY to files containing route/websocket handlers — for pure service/agent/task/client ` +
+  `modules mark them N/A (passing) and audit categories 1, 4, 5, 6. Set clean=true only if every ` +
+  `applicable category passes with no gaps. List each gap as category + file:line + issue.\n\n${STANDARD_RULES}`;
 
 const fixPrompt = (m, gaps) =>
   `Fix the logging gaps in \`${m}\` with minimal, targeted edits (reuse the existing logger; add the ` +
@@ -117,10 +123,18 @@ const fixPrompt = (m, gaps) =>
 let modules = explicitModules;
 if (!modules.length) {
   phase('Discover');
-  log(`Discovering route modules under ${dir}`);
+  log(`Discovering ${scope === 'routes' ? 'route' : 'service-wide'} modules under ${dir}`);
+  const discoverPrompt = scope === 'routes'
+    ? `List the Python route/handler modules under \`${dir}\` — files containing FastAPI ` +
+      `@router.get/post/put/delete/patch or websocket endpoints. Return their file paths only.`
+    : `List EVERY Python module under \`${dir}\` that contains executable logic worth logging: ` +
+      `route/websocket handlers, service-layer functions, agents, background/Celery tasks, ` +
+      `streaming/session managers, and clients/helpers that call external systems (DB, Redis, S3, ` +
+      `LLM APIs). EXCLUDE: tests, migrations, \`__init__.py\`, pure Pydantic schema/model files, ` +
+      `config/constants-only files, and anything under \`app/core/monitoring/\` (platform code, ` +
+      `R-028 — never audited by this sweep). Return file paths only.`;
   const found = await agent(
-    `List the Python route/handler modules under \`${dir}\` — files containing FastAPI ` +
-    `@router.get/post/put/delete/patch endpoints. Return their file paths only.`,
+    discoverPrompt,
     { agentType: 'general-purpose', phase: 'Discover', label: `discover:${dir}`, schema: DISCOVER_SCHEMA }
   );
   modules = (found && Array.isArray(found.modules) ? found.modules : []).filter(Boolean);
