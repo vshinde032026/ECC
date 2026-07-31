@@ -145,10 +145,13 @@ correcting course. Study only what SCOPE-in touches.
 - Duplicate-code registry (SuperStem: `REDUNDANCY_REGISTRY.md`) — if a
   touchpoint appears in an R-entry, every twin becomes a touchpoint too
 
-**Sweep the three surfaces** (run `workflows/dev-pipeline.workflow.js` with
-`profile: 'study'` — three parallel `fermi-feature-dev` sweeps returning a
-merged touchpoint map — or spawn parallel Explore / code-explorer subagents
-manually; either way you need conclusions, not file dumps):
+**Sweep the three surfaces** (run the dev-pipeline workflow with
+`profile: 'study'` — `Workflow({scriptPath:
+"${CLAUDE_PLUGIN_ROOT}/workflows/dev-pipeline.workflow.js", args: {...}})`,
+or the `/fermi:dev-pipeline study` command — three parallel `fermi-feature-dev`
+sweeps returning a merged touchpoint map; or spawn parallel Explore /
+code-explorer subagents manually. Either way you need conclusions, not file
+dumps):
 - **Frontend** — routes, pages/components, hooks, state (TanStack Query keys,
   Zustand stores), API client modules
 - **Backend** — routers → services → models for the affected domain, auth
@@ -363,8 +366,10 @@ or ship — Phase 7 is mandatory.
 ### Phase 7: CLOSE-OUT [HUMAN CHECKPOINT]
 
 Fixed checklist, run in this order, all items on the touched modules only.
-Items 1–5 are automated: run `workflows/dev-pipeline.workflow.js` with
-`profile: 'closeout'` and the touched module lists — layering runs first per
+Items 1–5 are automated: run the dev-pipeline workflow
+(`${CLAUDE_PLUGIN_ROOT}/workflows/dev-pipeline.workflow.js`, or
+`/fermi:dev-pipeline closeout ...`) with `profile: 'closeout'` and the
+touched module lists — layering runs first per
 module; then unit-tests ∥ console-logs as parallel siblings (tests touch
 `tests/**`, logging edits source — disjoint files; logging delegates to the
 `audit-backend-logging` workflow); then test-quality (`fermi-code-reviewer`

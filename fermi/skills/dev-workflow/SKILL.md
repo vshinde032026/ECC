@@ -40,7 +40,11 @@ The pipeline is decomposed into reusable unit blocks; the human gates are never 
   the opt-in hunters) — its toolset has no Edit, so read-only is structural.
   `unit-tests` ∥ `console-logs` (∥ opt-in hunters) share a wave after `layering`;
   `test-quality` ∥ `docs` share the next.
-- **`workflows/dev-pipeline.workflow.js`** — the runner. Executes ready `auto` nodes in
+- **`workflows/dev-pipeline.workflow.js`** — the runner (invoke via the
+  `/fermi:dev-pipeline` command, or directly:
+  `Workflow({scriptPath: "${CLAUDE_PLUGIN_ROOT}/workflows/dev-pipeline.workflow.js", ...})`
+  — never a repo-relative path; the plugin root is where the file lives when
+  installed). Executes ready `auto` nodes in
   parallel waves; on reaching a `gate`/`manual` node it HALTS and returns the human-step
   instruction plus resume args (`done: [...]`). The main session runs the gate with the
   user, then re-invokes to continue. `plan-review` pre-chews the eng gate with read-only
