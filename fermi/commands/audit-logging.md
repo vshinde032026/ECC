@@ -23,9 +23,12 @@ Launch the fermi logging sweep on: **$ARGUMENTS**
    and tell the user to create a branch first — this sweep edits source files
    (log statements only, but it must be reviewable). Do not proceed on main.
 
-3. **Warn on big sweeps.** If a `dir` was given, count its `.py` files first;
-   over 30, tell the user the expected scale (roughly 3–5 agent runs per file)
-   and confirm before launching.
+3. **State the expected scale.** If a `dir` was given, count its `.py` files
+   first and tell the user the agent estimate before launching: roughly
+   **1 discover + 1 agent per 8 files + up to 3 verify agents** (a 100-file
+   service ≈ 17 agents). Over 100 files, confirm before launching. Optional
+   tuning: `"batchSize": 3–15` (files per agent), `"verify": "none"` to skip
+   the independent spot-check.
 
 4. **Launch** the Workflow tool. `args` MUST be a real JSON object — never a
    prose string, never pseudo-code. Correct calls look exactly like these:
