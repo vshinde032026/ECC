@@ -197,6 +197,17 @@ if (!selected.length) {
 }
 const unknown = selected.filter(n => !NODES[n]);
 if (unknown.length) throw new Error(`dev-pipeline: unknown node(s): ${unknown.join(', ')}`);
+
+// frontend-only run: backend-only nodes (pytest, clean-logs census, test
+// review) cannot apply — trim them with a visible log instead of failing
+const BACKEND_ONLY = ['unit-tests', 'console-logs', 'test-quality'];
+if (!backendModules.length && frontendModules.length) {
+  const dropped = selected.filter(n => BACKEND_ONLY.includes(n));
+  if (dropped.length) {
+    selected = selected.filter(n => !BACKEND_ONLY.includes(n));
+    log(`Frontend-only run — dropping backend-only node(s): ${dropped.join(', ')}`);
+  }
+}
 const done = new Set(strList(args.done).filter(n => NODES[n]));
 const results = {};
 
