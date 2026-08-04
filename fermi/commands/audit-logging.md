@@ -1,34 +1,38 @@
 ---
-description: Sweep the backend-logging auditor over a backend service or module set — audit → fix → re-audit per module until logs conform to the SuperStem/Fermi logging standard. Covers routes AND services/agents/tasks by default. Usage /fermi:audit-logging <service-root | dir | file.py ...> [routes] [maxPasses]
+description: Flow-based logging sweep — per router, backtrack every route through the service functions to the data layer, judge where logs are required along each chain, apply them per file, verify a sample of routes. Usage /fermi:audit-logging <service-root | router-file.py ...>
 ---
 
 # Audit backend logging
 
-Launch the fermi logging sweep on: **$ARGUMENTS**
+Launch the fermi flow-based logging sweep on: **$ARGUMENTS**
+
+How it works: **Map** entry points (routers + non-routed Celery tasks) → **Trace**
+each entry's routes down through services to the data layer, read-only, judging
+where logs are REQUIRED along each chain and what's redundant across layers →
+**Apply** the merged per-file gap list (each file edited by exactly one agent) →
+**Verify** by independently re-tracing a sample of routes.
 
 ## Steps
 
 1. **Parse the arguments.**
-   - A path ending in `.py` (one or more) → pass as `modules: [...]`.
-   - A directory path → pass as `dir: "<path>"`. A service root (e.g. `euler-api`
-     or `euler-api/app`) is valid — discovery finds every module with logic worth
-     logging: routes, websocket handlers, service layer, agents, Celery tasks,
-     external-system clients. Tests/schemas/config/`__init__` are excluded.
-   - The bare word `routes` → pass `scope: "routes"` (route/ws handler modules only).
-   - A bare integer (1–4) anywhere → `maxPasses` (default 2).
-   - No arguments → ask which service or files to audit; suggest what you can
-     see (e.g. `backend/app`, `euler-api/app`).
+   - A service root or directory → `dir: "<path>"` (e.g. `euler-api/app`) —
+     entry points are discovered.
+   - One or more `.py` paths → `modules: [...]` — treated as entry-point
+     modules (router/task files) to trace; their chains are followed wherever
+     they lead, so service files don't need listing.
+   - No arguments → ask which service or routers to sweep; suggest what you
+     can see (e.g. `backend/app`, `euler-api/app`).
 
 2. **Safety gate.** Run `git branch --show-current`. If on `main`/`master`, STOP
    and tell the user to create a branch first — this sweep edits source files
    (log statements only, but it must be reviewable). Do not proceed on main.
 
-3. **State the expected scale.** If a `dir` was given, count its `.py` files
-   first and tell the user the agent estimate before launching: roughly
-   **1 discover + 1 agent per 8 files + up to 3 verify agents** (a 100-file
-   service ≈ 17 agents). Over 100 files, confirm before launching. Optional
-   tuning: `"batchSize": 3–15` (files per agent), `"verify": "none"` to skip
-   the independent spot-check.
+3. **State the expected scale.** Count the router/task modules first and tell
+   the user the agent estimate before launching: roughly **1 map + 1 trace
+   agent per 3 entry modules + 1 apply agent per 8 gap-carrying files + up to
+   3 verify agents** (a 14-router service ≈ 12 agents; a 96-router service
+   ≈ 45–50). Over 30 entry modules, confirm before launching. Optional
+   tuning: `"traceBatch": 1–6`, `"applyBatch": 3–15`, `"verify": "none"`.
 
 4. **Launch** the Workflow tool. `args` MUST be a real JSON object — never a
    prose string, never pseudo-code. Correct calls look exactly like these:
@@ -41,11 +45,11 @@ Launch the fermi logging sweep on: **$ARGUMENTS**
    ```
 
    ```
-   args: { "modules": ["backend/app/routers/notebook.py"], "maxPasses": 3 }
+   args: { "modules": ["backend/app/routers/notebook.py", "backend/app/routers/courses.py"] }
    ```
 
    ```
-   args: { "dir": "backend/app", "scope": "routes" }
+   args: { "dir": "backend/app", "traceBatch": 2, "verify": "none" }
    ```
 
 5. **When it completes, report:** the clean/dirty count, per-module verdicts,

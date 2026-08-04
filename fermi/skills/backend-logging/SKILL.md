@@ -132,8 +132,8 @@ with bounded fix → re-audit loops:
 ```
 Workflow({
   scriptPath: "${CLAUDE_PLUGIN_ROOT}/workflows/audit-backend-logging.workflow.js",
-  args: { dir: "<the directory>" }        // scope: 'service' by default — routes AND
-})                                        // services/agents/tasks; 'routes' to restrict
+  args: { "dir": "<service root>" }   // flow-based: maps routers, traces each route
+})                                    // to the data layer, applies merged gaps per file
 ```
 
 (equivalently: the `/fermi:audit-logging <dir>` command). Working inline on a whole
