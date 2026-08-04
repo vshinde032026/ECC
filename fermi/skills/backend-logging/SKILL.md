@@ -63,6 +63,30 @@ logger.info("Listed discover courses", extra={"section": section, "count": len(o
 `%`-style is acceptable for simple interpolation (`logger.warning("Ping failed: %s", e)`), but
 `extra` is preferred wherever the value is a field someone would filter on.
 
+## Event catalog — one shape per event type, everywhere
+
+The same kind of event must produce the same-shaped log in every flow and every
+service — that is what makes logs queryable. When adding or fixing a log, find the
+event type here and use its canonical message + extra keys (extend `extra` with
+flow-specific ids; never reword the message):
+
+| Event | Level | Message (constant) | extra keys |
+|---|---|---|---|
+| request entry | INFO | `"<action> requested"` | key ids (`course_id`, `note_id`, …) |
+| request outcome | INFO | `"<action> completed"` | outcome summary: counts, status, key ids |
+| cache hit | INFO | `"cache hit"` | `key`, key ids |
+| cache miss | DEBUG | `"cache miss, falling through"` | `key` |
+| db zero rows | DEBUG | `"query returned no rows"` | what was queried |
+| external call | DEBUG | `"calling <system>"` | system (`s3`/`redis`/`openrouter`/…), key param |
+| external failure | WARNING | `"<system> call failed"` | system, operation |
+| celery dispatch | INFO | `"task dispatched"` | `task`, `queue`, key arg |
+| job state change | INFO | `"job state changed"` | `job_id`, `state` |
+| expected error | WARNING | `"<action> rejected"` | reason, key ids |
+| unexpected error | exception | `"<action> failed"` | key ids (traceback auto-attached) |
+
+`<action>`/`<system>` are the only variable parts and live in the message template,
+chosen once per call site — everything runtime-variable goes in `extra`.
+
 ## What the platform already gives you — do NOT add these by hand (findings)
 
 Every record automatically carries: `timestamp`, `level`, `logger`, `service`, `env`,
