@@ -210,8 +210,11 @@ if (!census) throw new Error('audit-backend-logging: census agent returned nothi
 const censusPath = census.censusPath || '';
 let entries = (census.entries || []).filter(e => e && e.path);
 if (onlyEntries.length) {
-  const want = new Set(onlyEntries);
-  entries = entries.filter(e => want.has(e.path) || onlyEntries.some(w => e.path.endsWith(w)));
+  // match exact paths, path suffixes, or directory prefixes ("notebook" matches
+  // "notebook/tasks/x.py") — dev-pipeline passes touched-module DIRS as entries
+  entries = entries.filter(e => onlyEntries.some(w =>
+    e.path === w || e.path.endsWith(w) || e.path.startsWith(w.endsWith('/') ? w : w + '/')
+  ));
 }
 const violationFiles = (census.violationFiles || []).filter(v => v && v.file && v.count > 0);
 log(`${entries.length} entry point(s), ${violationFiles.length} file(s) with mechanical violations, ${census.dynamicSites || 0} dynamic dispatch site(s)`);

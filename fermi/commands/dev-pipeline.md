@@ -24,8 +24,13 @@ Run the fermi dev-pipeline graph with: **$ARGUMENTS**
    - `feature` also → `specPath` + `planPath`; `bugfix` → `planPath`
      (dated paths under `docs/superpowers/specs|plans/`, today's date).
    - `closeout` / `closeout-deep` → `backendModules[]` and/or
-     `frontendModules[]` (the touched modules), plus `feature` for the docs
-     node; optionally `planPath`.
+     `frontendModules[]` (the touched modules), `serviceRoot` (the backend
+     package dir, e.g. `"backend/app"` — the console-logs node's census needs
+     it), plus `feature` for the docs node; optionally `planPath`.
+   - ALWAYS pass `"pluginRoot": "${CLAUDE_PLUGIN_ROOT}"` — study agents use it
+     to run the census script and the console-logs child workflow requires it.
+   - Per-module nodes run BATCHED (one agent per ~8 modules, loops inside the
+     agent) — never quote a one-agent-per-file estimate.
 
 2. **Safety gate.** Profiles that edit the tree (`closeout*`, resumed
    `feature`/`bugfix` past the code node) must run on a branch — check

@@ -59,6 +59,14 @@ for editing/drafting work, `fermi-code-reviewer` for every report-only node
 (its toolset has no Edit, so read-only is structural). No dependency on the
 ecc plugin; lens/hunt expertise is carried by the prompts.
 
+**Batched:** per-module nodes run ONE agent per batch (`moduleBatch` ≈ 8 for
+layering/quality/hunts, `testBatch` ≈ 4 for unit-tests) with any fix/test loop
+INSIDE the agent — never one agent per module per round. `study` agents run
+`scripts/logging_census.py` + git grep first and read only the candidates.
+`console-logs` delegates to the census-driven `audit-backend-logging` child
+(`serviceRoot` + `pluginRoot` args required). 10 touched modules ≈ 9 agents +
+the logging child.
+
 ## Node kinds
 
 | Kind | Who runs it | Runner behavior |

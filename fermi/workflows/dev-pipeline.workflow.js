@@ -105,10 +105,21 @@ export const meta = {
 //     planPath?:        string,    // plan doc path (same)
 //     backendModules?:  string[],  // touched backend modules — layering, unit-tests, console-logs
 //     frontendModules?: string[],  // touched frontend files/dirs — layering
-//     maxPasses?:       number,    // bounded-loop rounds (default 2, clamped 1..4)
+//     serviceRoot?:     string,    // backend service package dir (e.g. "backend/app") — required
+//                                  // by console-logs (census-driven child workflow)
+//     pluginRoot?:      string,    // fermi plugin root — lets study agents run logging_census.py
+//                                  // and is forwarded to the console-logs child
+//     moduleBatch?:     number,    // modules per layering/quality/hunt agent (default 8, 3..15)
+//     testBatch?:       number,    // modules per unit-test agent (default 4, 2..8)
+//     maxPasses?:       number,    // INTERNAL fix/test rounds per module (default 2, clamped 1..4)
 //     agentType?:       string,    // global override: replaces every node's specialist default
 //     loggingWorkflowPath?: string // default 'fermi/workflows/audit-backend-logging.workflow.js'
 //   }
+//
+// AGENT ECONOMICS (same lesson as the logging sweep): per-module nodes run ONE
+// agent per BATCH of modules with any fix/test loop INSIDE the agent — never
+// one agent per module per round. 10 touched modules ≈ 2 layering + 3 tests +
+// 2 test-quality + census-driven logging child + 1 docs ≈ a dozen agents.
 //
 // Returns:
 //   { status: 'halted' | 'complete', halted?, kind?, instruction?,
@@ -135,6 +146,10 @@ const scopeIn = strList(args.scopeIn);
 const backendModules = strList(args.backendModules);
 const frontendModules = strList(args.frontendModules);
 const loggingWorkflowPath = str(args.loggingWorkflowPath) || 'fermi/workflows/audit-backend-logging.workflow.js';
+const serviceRoot = str(args.serviceRoot);
+const pluginRoot = str(args.pluginRoot);
+const moduleBatch = boundInt(args.moduleBatch, 3, 15, 8);
+const testBatch = boundInt(args.testBatch, 2, 8, 4);
 
 // ---- the graph (mirror of fermi/graphs/dev-pipeline.md) -------------------
 const NODES = {
@@ -255,20 +270,36 @@ const DRAFT_SCHEMA = {
     openQuestions: { type: 'array', items: { type: 'string' } }
   }
 };
-const LAYER_SCHEMA = {
-  type: 'object', additionalProperties: false, required: ['violationsFound', 'violationsFixed'],
+const LAYER_BATCH_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['modules'],
   properties: {
-    violationsFound: { type: 'integer' }, violationsFixed: { type: 'integer' },
-    remaining: { type: 'array', items: { type: 'string' } },
-    summary: { type: 'string' }
+    modules: {
+      type: 'array',
+      items: {
+        type: 'object', additionalProperties: false, required: ['module', 'violationsFound', 'violationsFixed'],
+        properties: {
+          module: { type: 'string' },
+          violationsFound: { type: 'integer' }, violationsFixed: { type: 'integer' },
+          remaining: { type: 'array', items: { type: 'string' } }
+        }
+      }
+    }
   }
 };
-const TEST_SCHEMA = {
-  type: 'object', additionalProperties: false, required: ['pass', 'coverage'],
+const TEST_BATCH_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['modules'],
   properties: {
-    pass: { type: 'boolean' }, coverage: { type: 'number' },
-    summary: { type: 'string' },
-    remaining: { type: 'array', items: { type: 'string' } }
+    modules: {
+      type: 'array',
+      items: {
+        type: 'object', additionalProperties: false, required: ['module', 'pass', 'coverage'],
+        properties: {
+          module: { type: 'string' },
+          pass: { type: 'boolean' }, coverage: { type: 'number' },
+          remaining: { type: 'array', items: { type: 'string' } }
+        }
+      }
+    }
   }
 };
 const FINDINGS_SCHEMA = {
@@ -288,12 +319,46 @@ const FINDINGS_SCHEMA = {
     }
   }
 };
-const QUALITY_SCHEMA = {
-  type: 'object', additionalProperties: false, required: ['verdict', 'gaps'],
+const QUALITY_BATCH_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['modules'],
   properties: {
-    verdict: { type: 'string', enum: ['strong', 'adequate', 'weak'] },
-    gaps: { type: 'array', items: { type: 'string' } },
-    summary: { type: 'string' }
+    modules: {
+      type: 'array',
+      items: {
+        type: 'object', additionalProperties: false, required: ['module', 'verdict', 'gaps'],
+        properties: {
+          module: { type: 'string' },
+          verdict: { type: 'string', enum: ['strong', 'adequate', 'weak'] },
+          gaps: { type: 'array', items: { type: 'string' } }
+        }
+      }
+    }
+  }
+};
+const HUNT_BATCH_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['modules'],
+  properties: {
+    modules: {
+      type: 'array',
+      items: {
+        type: 'object', additionalProperties: false, required: ['module', 'findings'],
+        properties: {
+          module: { type: 'string' },
+          findings: {
+            type: 'array',
+            items: {
+              type: 'object', additionalProperties: false, required: ['severity', 'issue'],
+              properties: {
+                severity: { type: 'string', enum: ['blocking', 'important', 'minor'] },
+                area: { type: 'string' },
+                issue: { type: 'string' },
+                suggestion: { type: 'string' }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 };
 const DOCS_SCHEMA = {
@@ -319,6 +384,12 @@ async function nodeStudy() {
     (intakePath
       ? `Read the intake at \`${intakePath}\` first; treat its "Current state" claims about this surface as hypotheses and verify each against the actual code — report mismatches as {claim, reality}, do not silently correct.\n`
       : 'No intake file provided — report an empty mismatches list.\n') +
+    `DETERMINISTIC TOOLS FIRST, reading second: ` +
+    (pluginRoot && (s.key === 'backend' || s.key === 'workers')
+      ? `run \`python3 "${pluginRoot}/scripts/logging_census.py" <service root> --out /tmp/study-census.json\` — it gives you the full entry-point table (routers, Celery tasks, middleware, signals) and call chains for free; `
+      : ``) +
+    `use git grep with feature keywords to build a candidate file list, then READ ONLY the candidates — do not ` +
+    `browse the tree file by file.\n` +
     `Sweep: ${s.hint}. Ground in the repo CLAUDE.md, docs/feature/<feature>/ docs, module CLAUDE.md files, ` +
     `LEGACY_QUARANTINE.md (never propose touching quarantined paths) and REDUNDANCY_REGISTRY.md ` +
     `(a touchpoint in an R-entry makes every twin a touchpoint too). ` +
@@ -381,46 +452,48 @@ async function nodePlanDraft() {
   );
 }
 
-// ---- layering: per touched module, parallel (distinct files) --------------
-function layerPrompt(m, kindLabel) {
-  return `CLOSE-OUT mode, check: layering. Audit \`${m}\` (${kindLabel}) and fix violations with minimal edits.\n` +
-    (planPath ? `The LOCKED plan is at \`${planPath}\` — the code must match its LLD interfaces/classes; report drift in remaining[].\n` : '') +
-    `Report violationsFound, violationsFixed, and anything needing a human decision in remaining[].\n\n${LAYER_RULES}`;
-}
-
+// ---- layering: BATCHED — one agent per group of modules -------------------
 async function nodeLayering() {
   if (!backendModules.length && !frontendModules.length) {
     throw new Error("node 'layering' requires args.backendModules[] and/or args.frontendModules[]");
   }
-  const thunks = [
-    ...backendModules.map(m => () =>
-      agent(layerPrompt(m, 'backend'), { agentType: agentFor(FEATURE_DEV), phase: 'Layering', label: `layer:${m}`, schema: LAYER_SCHEMA })
-        .then(r => ({ module: m, surface: 'backend', ...(r || {}) }))),
-    ...frontendModules.map(m => () =>
-      agent(layerPrompt(m, 'frontend'), { agentType: agentFor(FEATURE_DEV), phase: 'Layering', label: `layer:${m}`, schema: LAYER_SCHEMA })
-        .then(r => ({ module: m, surface: 'frontend', ...(r || {}) })))
+  const layerBatchPrompt = (mods, surface, n, total) =>
+    `CLOSE-OUT mode, check: layering (${surface} batch ${n + 1}/${total}). Audit and fix EACH of these ` +
+    `modules, one at a time, completely:\n` +
+    mods.map((m, i) => `${i + 1}. \`${m}\``).join('\n') +
+    `\n\nFix violations with minimal edits.` +
+    (planPath ? ` The LOCKED plan is at \`${planPath}\` — the code must match its LLD interfaces/classes; report drift in remaining[].` : '') +
+    ` Return one entry per module: module (path as given), violationsFound, violationsFixed, remaining ` +
+    `(items needing a human decision). Every listed module MUST appear in your answer.\n\n${LAYER_RULES}`;
+  const jobs = [
+    ...chunk(backendModules, moduleBatch).map((g, n, all) => ({ g, surface: 'backend', n, total: all.length })),
+    ...chunk(frontendModules, moduleBatch).map((g, n, all) => ({ g, surface: 'frontend', n, total: all.length }))
   ];
-  const modules = (await parallel(thunks)).filter(Boolean);
+  const out = (await parallel(jobs.map(j => () =>
+    agent(layerBatchPrompt(j.g, j.surface, j.n, j.total), { agentType: agentFor(FEATURE_DEV), phase: 'Layering', label: `layer:${j.surface}:b${j.n + 1}`, schema: LAYER_BATCH_SCHEMA })
+      .then(r => ({ surface: j.surface, expected: j.g, modules: (r && r.modules) || [] }))
+  ))).filter(Boolean);
+  const modules = accountBatch(out, 'layering');
   return { modules, fixed: modules.reduce((n, r) => n + (r.violationsFixed || 0), 0) };
 }
 
-// ---- unit-tests: per backend module, bounded loop (tests/** only) ---------
+// ---- unit-tests: BATCHED — pytest loop runs INSIDE the agent --------------
 async function nodeUnitTests() {
   if (!backendModules.length) throw new Error("node 'unit-tests' requires args.backendModules[]");
-  const perModule = async (m) => {
-    let t = null;
-    for (let round = 1; round <= maxPasses; round++) {
-      t = await agent(
-        `CLOSE-OUT mode, check: unit-tests (round ${round}). Bring \`${m}\` to full coverage: read the module and ` +
-        `its existing tests, write/update cases, then RUN pytest with coverage on it and report the real result ` +
-        `(pass, coverage %). List uncovered/unfixable spots in remaining[].\n\n${TEST_RULES}`,
-        { agentType: agentFor(FEATURE_DEV), phase: 'Unit tests', label: `tests:${m}:r${round}`, schema: TEST_SCHEMA }
-      );
-      if (t && t.pass === true && Number.isFinite(t.coverage) && t.coverage >= 90) break;
-    }
-    return { module: m, ...(t || { pass: false, coverage: 0 }) };
-  };
-  const modules = (await parallel(backendModules.map(m => () => perModule(m)))).filter(Boolean);
+  const groups = chunk(backendModules, testBatch);
+  const testBatchPrompt = (mods, n) =>
+    `CLOSE-OUT mode, check: unit-tests (batch ${n + 1}/${groups.length}). For EACH module below, one at a ` +
+    `time: read the module and its existing tests, write/update cases, RUN pytest with coverage, and if not ` +
+    `passing with >=90% coverage, fix the tests and re-run — up to ${maxPasses} rounds per module, looping ` +
+    `YOURSELF (do not stop at one attempt). Then move to the next module.\n` +
+    mods.map((m, i) => `${i + 1}. \`${m}\``).join('\n') +
+    `\n\nReturn one entry per module: module, pass, coverage (the REAL numbers from your final run), ` +
+    `remaining (uncovered/unfixable spots). Every listed module MUST appear.\n\n${TEST_RULES}`;
+  const out = (await parallel(groups.map((g, n) => () =>
+    agent(testBatchPrompt(g, n), { agentType: agentFor(FEATURE_DEV), phase: 'Unit tests', label: `tests:b${n + 1}`, schema: TEST_BATCH_SCHEMA })
+      .then(r => ({ expected: g, modules: (r && r.modules) || [] }))
+  ))).filter(Boolean);
+  const modules = accountBatch(out, 'unit-tests');
   return {
     modules,
     passing: modules.filter(r => r.pass === true).length,
@@ -428,11 +501,15 @@ async function nodeUnitTests() {
   };
 }
 
-// ---- console-logs: the clean-logs sweep, reused as a child workflow -------
+// ---- console-logs: census-driven child workflow (v5 contract) -------------
 async function nodeConsoleLogs() {
   if (!backendModules.length) throw new Error("node 'console-logs' requires args.backendModules[]");
+  need(serviceRoot, "node 'console-logs' requires args.serviceRoot (backend service package dir, e.g. \"backend/app\")");
+  // child expects entry paths relative to serviceRoot
+  const prefix = serviceRoot.endsWith('/') ? serviceRoot : serviceRoot + '/';
+  const entries = backendModules.map(m => m.startsWith(prefix) ? m.slice(prefix.length) : m);
   try {
-    return await workflow({ scriptPath: loggingWorkflowPath }, { modules: backendModules, maxPasses });
+    return await workflow({ scriptPath: loggingWorkflowPath }, { dir: serviceRoot, pluginRoot, entries, lanes: 'both' });
   } catch (e) {
     const msg = String(e && e.message ? e.message : e);
     log(`console-logs: child workflow failed (${msg}) — run audit-backend-logging manually`);
@@ -484,60 +561,65 @@ async function nodePlanReview() {
   return { byLens, total: all.length, blocking };
 }
 
-// ---- silent-failures / security: report-only hunts on the touched modules -
+// ---- silent-failures / security: BATCHED report-only hunts ----------------
 // (report-only ON PURPOSE: they share the wave with console-logs, which edits
 // the same source files — reporters and one editor don't collide)
-function huntTargets() {
-  return [...backendModules, ...frontendModules];
+async function huntBatched(kind, phaseName, focus) {
+  const targets = [...backendModules, ...frontendModules];
+  const groups = chunk(targets, moduleBatch);
+  const out = (await parallel(groups.map((g, n) => () =>
+    agent(
+      `READ-ONLY ${kind} review, batch ${n + 1}/${groups.length}. Review EACH module below, one at a time:\n` +
+      g.map((m, i) => `${i + 1}. \`${m}\``).join('\n') +
+      `\n\n${focus}\nDo NOT edit — findings go to the close-out summary for the human. Return one entry per ` +
+      `module: module + findings ({severity, area, issue, suggestion}); findings: [] if clean. Every listed ` +
+      `module MUST appear in your answer.`,
+      { agentType: agentFor(CODE_REVIEWER), phase: phaseName, label: `${kind}:b${n + 1}`, schema: HUNT_BATCH_SCHEMA }
+    ).then(r => ({ expected: g, modules: (r && r.modules) || [] }))
+  ))).filter(Boolean);
+  const modules = accountBatch(out, kind).map(m => ({ module: m.module, findings: m.findings || [] }));
+  return { modules, total: modules.reduce((n, r) => n + r.findings.length, 0) };
 }
 
 async function nodeSilentFailures() {
-  const reviews = await parallel(huntTargets().map(m => () =>
-    agent(
-      `READ-ONLY review of \`${m}\`: hunt silent failures — swallowed exceptions (bare pass / bare raise with no log, ` +
-      `caught-and-ignored), bad fallbacks that mask errors (defaulting on failure without signal), missing error ` +
-      `propagation, promises/tasks whose failure nobody observes. Do NOT edit — findings go to the close-out summary ` +
-      `for the human. {severity, area, issue, suggestion} per finding; empty list if clean.`,
-      { agentType: agentFor(CODE_REVIEWER), phase: 'Silent failures', label: `silent:${m}`, schema: FINDINGS_SCHEMA }
-    ).then(r => ({ module: m, findings: (r && r.findings) || [] }))
-  ));
-  const modules = reviews.filter(Boolean);
-  return { modules, total: modules.reduce((n, r) => n + r.findings.length, 0) };
+  return huntBatched('silent-failures', 'Silent failures',
+    'Hunt silent failures: swallowed exceptions (bare pass / bare raise with no log, caught-and-ignored), ' +
+    'bad fallbacks that mask errors (defaulting on failure without signal), missing error propagation, ' +
+    'promises/tasks whose failure nobody observes.');
 }
 
 async function nodeSecurity() {
-  const reviews = await parallel(huntTargets().map(m => () =>
-    agent(
-      `READ-ONLY security review of \`${m}\` (recently changed code first): missing/weak auth on endpoints, ` +
-      `unvalidated user input, injection (SQL/command/LaTeX), SSRF in outbound calls, secrets or credentials in ` +
-      `code or logs, unsafe deserialization, permission checks that trust the client. Do NOT edit — findings go to ` +
-      `the close-out summary for the human. {severity, area, issue, suggestion} per finding; empty list if clean.`,
-      { agentType: agentFor(CODE_REVIEWER), phase: 'Security', label: `security:${m}`, schema: FINDINGS_SCHEMA }
-    ).then(r => ({ module: m, findings: (r && r.findings) || [] }))
-  ));
-  const modules = reviews.filter(Boolean);
-  return { modules, total: modules.reduce((n, r) => n + r.findings.length, 0) };
+  return huntBatched('security', 'Security',
+    'Security review (recently changed code first): missing/weak auth on endpoints, unvalidated user input, ' +
+    'injection (SQL/command/LaTeX), SSRF in outbound calls, secrets or credentials in code or logs, unsafe ' +
+    'deserialization, permission checks that trust the client.');
 }
 
-// ---- test-quality: independent check on the tests the unit-tests node wrote
+// ---- test-quality: BATCHED independent check on the new tests -------------
 async function nodeTestQuality() {
   const unit = results['unit-tests'];
-  const reviews = await parallel(backendModules.map(m => () =>
+  const groups = chunk(backendModules, Math.max(moduleBatch - 2, 3));
+  const out = (await parallel(groups.map((g, n) => () =>
     agent(
-      `READ-ONLY test-quality review for \`${m}\` and its tests under tests/. The test author reported: ` +
-      `${JSON.stringify((unit && unit.modules || []).find(r => r.module === m) || 'no self-report')}. ` +
-      `You are the independent check — coverage % is NOT the question; behavioral coverage is. Judge: do the tests ` +
-      `assert real behavior (not mock-echoes), would they catch the realistic bugs in this module (wrong branch, ` +
-      `off-by-one, error path, permission miss), are corner cases and failure paths exercised, is anything ` +
-      `over-mocked to the point of testing nothing? Do NOT edit. Verdict strong|adequate|weak + concrete gaps.`,
-      { agentType: agentFor(CODE_REVIEWER), phase: 'Test quality', label: `test-quality:${m}`, schema: QUALITY_SCHEMA }
-    ).then(r => ({ module: m, ...(r || { verdict: 'weak', gaps: ['analyzer returned no result'] }) }))
-  ));
-  const modules = reviews.filter(Boolean);
+      `READ-ONLY test-quality review, batch ${n + 1}/${groups.length}. For EACH module below, review the module ` +
+      `and its tests under tests/:\n` +
+      g.map((m, i) => {
+        const rep = (unit && unit.modules || []).find(r => r.module === m);
+        return `${i + 1}. \`${m}\` — test author's self-report: ${rep ? JSON.stringify(rep) : 'none'}`;
+      }).join('\n') +
+      `\n\nYou are the independent check — coverage % is NOT the question; behavioral coverage is. Judge: do the ` +
+      `tests assert real behavior (not mock-echoes), would they catch the realistic bugs (wrong branch, off-by-one, ` +
+      `error path, permission miss), are corner cases and failure paths exercised, is anything over-mocked to the ` +
+      `point of testing nothing? Do NOT edit. Return one entry per module: module, verdict strong|adequate|weak, ` +
+      `concrete gaps. Every listed module MUST appear in your answer.`,
+      { agentType: agentFor(CODE_REVIEWER), phase: 'Test quality', label: `testq:b${n + 1}`, schema: QUALITY_BATCH_SCHEMA }
+    ).then(r => ({ expected: g, modules: (r && r.modules) || [] }))
+  ))).filter(Boolean);
+  const modules = accountBatch(out, 'test-quality').map(m => ({ module: m.module, verdict: m.verdict || 'weak', gaps: m.gaps || [] }));
   return {
     modules,
     weak: modules.filter(r => r.verdict === 'weak').map(r => r.module),
-    gaps: modules.reduce((n, r) => n + (r.gaps || []).length, 0)
+    gaps: modules.reduce((n, r) => n + r.gaps.length, 0)
   };
 }
 
@@ -562,6 +644,30 @@ async function nodeDocs() {
 // ---- helpers --------------------------------------------------------------
 function str(v) { return typeof v === 'string' ? v.trim() : ''; }
 function strList(v) { return Array.isArray(v) ? v.filter(x => typeof x === 'string' && x.trim()) : []; }
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+// flatten batch results, filling in explicit placeholders for modules a batch
+// agent failed to report (no silent drops)
+function accountBatch(out, label) {
+  const reported = new Map();
+  for (const b of out) for (const m of b.modules) if (m && m.module) reported.set(m.module, m);
+  const all = [];
+  for (const b of out) {
+    for (const expected of b.expected) {
+      if (reported.has(expected)) {
+        const m = reported.get(expected);
+        if (!all.includes(m)) all.push(m);
+      } else {
+        log(`WARNING: ${label}: no verdict for ${expected} from its batch agent`);
+        all.push({ module: expected, remaining: [`no verdict from batch agent`], findings: [], gaps: ['no verdict from batch agent'], verdict: 'weak', pass: false, coverage: 0, violationsFound: 0, violationsFixed: 0 });
+      }
+    }
+  }
+  return all;
+}
 function need(v, msg) { if (!v) throw new Error(`dev-pipeline: ${msg}`); }
 
 // validate a node's inputs BEFORE it enters a parallel wave — thunks that
@@ -579,6 +685,9 @@ function validateNode(id) {
   }
   if ((id === 'unit-tests' || id === 'console-logs' || id === 'test-quality') && !backendModules.length) {
     throw new Error(`dev-pipeline: node '${id}' requires args.backendModules[]`);
+  }
+  if (id === 'console-logs') {
+    need(serviceRoot, "node 'console-logs' requires args.serviceRoot (backend service package dir, e.g. \"backend/app\")");
   }
   if (id === 'docs') {
     need(feature, "node 'docs' requires args.feature (names the docs/feature/<feature>/ dir)");
