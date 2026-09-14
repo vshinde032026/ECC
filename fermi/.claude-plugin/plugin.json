@@ -1,0 +1,24 @@
+{
+  "name": "fermi",
+  "version": "0.6.1",
+  "description": "Project-aware agentic setup built on ECC. Hand-tuned agents that understand our repos, plus loops, workflows, and graphs for orchestrating them. Consumed by git submodule into our other projects.",
+  "author": {
+    "name": "Fermi",
+    "email": "vaibhav@fermi.ai"
+  },
+  "license": "MIT",
+  "skills": [
+    "./skills/"
+  ],
+  "keywords": [
+    "agents",
+    "workflows",
+    "orchestration",
+    "agentic",
+    "project-aware"
+  ],
+  "mcpServers": {},
+  "commands": [
+    "./commands/"
+  ]
+}

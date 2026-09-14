@@ -1,0 +1,51 @@
+# agents/ — TODO (Stage 1, the main folder)
+
+Project-aware agents live here. Each is a **copy** of an ECC agent from `../../agents/`
+with a hand-written `## Project context` section appended so it understands our repo.
+
+We copy (never edit ECC's originals) so fermi stays self-contained and clone-and-go.
+
+## What goes in a fermi agent
+
+A markdown file with YAML frontmatter + instructions. Rules from the plugin schema:
+
+- `tools:` is a **comma-separated scalar**, not a YAML list — e.g. `tools: Read, Grep, Glob`.
+- Keep `name`, `description`, `tools`, `model` in the frontmatter.
+- Agents are auto-discovered from this folder — do NOT list them in `plugin.json`.
+
+## Anatomy
+
+```markdown
+---
+name: fermi-code-reviewer
+description: Reviews diffs against our conventions.
+tools: Read, Grep, Glob
+model: opus
+---
+<the base ECC agent instructions>
+
+## Project context
+- Stack & structure: <languages, framework, where code lives>
+- Conventions: <the rules this agent must enforce>
+- Requirements & gotchas: <what "correct" means here, what to never do>
+```
+
+## Checklist
+
+- [ ] Decide the target repo (do NOT tailor until this is chosen).
+- [ ] Copy the daily-driver agents from `../../agents/`:
+  - [ ] `code-reviewer.md` -> `fermi-code-reviewer.md`
+  - [ ] `code-explorer.md`
+  - [ ] `code-architect.md` (or `architect.md`)
+  - [ ] `planner.md` (if present) or the equivalent
+  - [ ] `build-error-resolver.md`
+  - [ ] the language reviewer for the stack (e.g. `python-reviewer.md`)
+- [ ] Rename each with a `fermi-` prefix to avoid clashing with ECC agents.
+- [ ] Add a `## Project context` section to each (draft from the real repo, review by hand).
+- [ ] Confirm each agent loads and behaves project-aware on a real task.
+
+## Notes
+
+- Start with the SMALLEST useful set. You do not need all 67 ECC agents.
+- Keep the `## Project context` blocks consistent in shape across agents — that
+  consistency is what makes Stage 2 (factoring into `../context/`) trivial later.
