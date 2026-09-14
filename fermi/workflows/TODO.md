@@ -22,6 +22,29 @@
   Self-contained (loop inlined — the Workflow sandbox can't import `../lib/`). Parses clean,
   plugin validates. Docs: [`../loops/refactor-module.md`](../loops/refactor-module.md).
 
+- ✅ **fe-refactor-page.workflow.js** — one page module under `frontend/src/pages/`
+  refactored onto the Fermi frontend architecture, then proven pixel-identical against
+  stage.fermi.ai at six viewports. 13 nodes: `analyze` fans out 5 read-only lenses
+  (inventory / violations / edges / duplication / dead), `plan-review` fans out 3
+  (architecture / promotion audit / parity risk), and `implement` runs SEQUENTIALLY per
+  BATCH of planned units with a bounded move → critique → fix loop. A PILOT node
+  migrates one unit alone first and writes `PLAYBOOK.md`; `implement` refuses to fan
+  out without it, and pilot/batch gaps feed forward so later batches do not
+  rediscover them. Batches escalate 3 → 6 → 12 behind a QUALITY circuit breaker
+  (stops below 2/3 clean reviewed batches; unreviewable batches excluded). Two
+  ceilings: `args.maxAgents` and the runtime TOKEN budget (`args.tokenFloor`).
+  Review is risk-tiered, `clean` is clamped by `reviewRan`, null agent results are
+  substituted rather than lost, plan-derived paths are validated before reaching a
+  prompt, and agent prose is fenced as untrusted when it crosses into another
+  prompt — patterns taken from the official `code-modernization` plugin. Returns
+  re-passable `remainingUnits` / `failedUnits`. ~24 agents for a clean 10-unit page. Three kinds of gate kept apart: machine (the 8 CI checks and
+  the parity thresholds), a semantic judge (`parity-verdict`, report-only, a different
+  agent from the one that did the fixing), and two human HALTs (`plan-gate`, `ship-gate`).
+  State crosses a gate via FILES in the target repo, never via `results`. Profiles: `page`,
+  `study`, `plan`, `build`, `parity`. Graph doc:
+  [`../graphs/fe-refactor-page.md`](../graphs/fe-refactor-page.md). Needs the target repo
+  to carry `docs/fe-cleanup/` + `frontend/e2e/fe-parity/`.
+
 `.workflow.js` scripts for the Claude Code Workflow tool — the **runnable** entry points
 that spawn many project-aware agents deterministically. A workflow reads a graph from
 `../graphs/`, applies loops from `../loops/`, and orchestrates the agents.
